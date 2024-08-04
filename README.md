@@ -93,3 +93,9 @@ sudo apt-get install hashcat
 ## USO
 chmod +x cyberreconsuite.sh
 ./cyberreconsuite.sh
+
+## Contribuir
+## Si deseas contribuir a este proyecto, por favor realiza un fork del repositorio y envía un pull request con tus mejoras. Agradecemos cualquier aporte para mejorar esta herramienta.
+
+## Licencia
+## Este proyecto está licenciado bajo la Licencia MIT. Consulta el archivo LICENSE para más detalles.
