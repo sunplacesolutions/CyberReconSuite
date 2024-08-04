@@ -1,0 +1,16 @@
+admin
+administrador
+administrator
+login
+dashboard
+uploads
+images
+css
+js
+api
+user
+usuario
+root
+test
+invitado
+guest
