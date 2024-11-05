@@ -1,12 +1,15 @@
 #!/bin/bash
 
+# Manejar Ctrl+C para salir limpiamente
+trap "echo -e '\n\033[1;31mInterrupción detectada. Saliendo del script...\033[0m'; exit 1" SIGINT
+
 # Verificar si las herramientas están instaladas y mostrar mensaje si falta alguna
 check_tool() {
     command -v "$1" >/dev/null 2>&1 || { echo -e "\033[1;31m\033[1mLa herramienta $1 no está instalada. Por favor, instálala primero.\033[0m"; missing_tools+=("$1"); }
 }
 
-# Lista de herramientas necesarias
-tools=("assetfinder" "httprobe" "subzy" "nikto" "sublist3r" "python3" "dirb" "gobuster" "masscan" "hashcat" "fzf")
+# Lista de herramientas necesarias (incluyendo herramientas adicionales usadas en el script)
+tools=("assetfinder" "httprobe" "subzy" "nikto" "sublist3r" "python3" "dirb" "gobuster" "masscan" "hashcat" "fzf" "dnsrecon" "lynx" "jq" "whois" "dig" "host" "nmap" "nslookup" "curl" "ping" "hashcat")
 
 # Lista para almacenar herramientas faltantes
 missing_tools=()
@@ -21,6 +24,24 @@ if [ ${#missing_tools[@]} -gt 0 ]; then
     echo -e "\033[1;31m\033[1mAlgunas herramientas faltantes: ${missing_tools[*]}\033[0m"
     echo -e "\033[1;31m\033[1mLas opciones que requieran estas herramientas no funcionarán.\033[0m"
 fi
+
+# Función para leer entrada del usuario con opciones mejoradas
+read_input() {
+    local prompt="$1"
+    local var_name="$2"
+    read -e -p "$prompt" input
+    printf -v "$var_name" '%s' "$input"
+}
+
+# Función para validar el formato del dominio
+validate_domain() {
+    local domain="$1"
+    if [[ ! "$domain" =~ ^([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$ ]]; then
+        echo -e "\033[0;31mFormato de dominio inválido. Por favor, ingresa un dominio válido.\033[0m"
+        return 1
+    fi
+    return 0
+}
 
 # Función para imprimir el banner
 print_banner() {
@@ -163,7 +184,7 @@ waybackurls_command() {
             echo "$results" | awk '{print "\033[1;3" ((NR%6)+1) "m" $0 "\033[0m"}'
         elif [ "$save_option" == "o" ]; then
             local file_name
-            read -p "Ingresa el nombre del archivo para guardar: " file_name
+            read_input "Ingresa el nombre del archivo para guardar: " file_name
             echo "$results" > "${file_name}.txt"
             echo -e "\033[0;32mResultados guardados en ${file_name}.txt\033[0m"
         fi
@@ -184,7 +205,7 @@ search_crtsh_domain() {
             echo "$results" | awk '{print "\033[1;3" ((NR%6)+1) "m" $0 "\033[0m"}'
         elif [ "$save_option" == "o" ]; then
             local file_name
-            read -p "Ingresa el nombre del archivo para guardar: " file_name
+            read_input "Ingresa el nombre del archivo para guardar: " file_name
             echo "$results" > "${file_name}.txt"
             echo -e "\033[0;32mResultados guardados en ${file_name}.txt\033[0m"
         fi
@@ -205,7 +226,7 @@ search_crtsh_org() {
             echo "$results" | awk '{print "\033[1;3" ((NR%6)+1) "m" $0 "\033[0m"}'
         elif [ "$save_option" == "o" ]; then
             local file_name
-            read -p "Ingresa el nombre del archivo para guardar: " file_name
+            read_input "Ingresa el nombre del archivo para guardar: " file_name
             echo "$results" > "${file_name}.txt"
             echo -e "\033[0;32mResultados guardados en ${file_name}.txt\033[0m"
         fi
@@ -370,10 +391,10 @@ run_assetfinder_httprobe() {
         echo -e "\033[0;35mResultados:\033[0m"
         echo "$results" | awk '{print "\033[1;3" ((NR%6)+1) "m" $0 "\033[0m"}'
         
-        read -p "¿Quieres guardar los resultados? (y/n): " save_option
+        read_input "¿Quieres guardar los resultados? (y/n): " save_option
         if [ "$save_option" == "y" ]; then
-            read -p "Ingresa el nombre del archivo (o presiona Enter para usar el formato por defecto 'alive_$domain.txt'): " file_name
-            file_name=${file_name:-alive_$domain.txt}
+            read_input "Ingresa el nombre del archivo (o presiona Enter para usar el formato por defecto 'alive_$domain.txt'): " file_name
+            file_name=${file_name:-"alive_$domain.txt"}
             echo "$results" > "$file_name"
             echo -e "\033[0;32mResultados guardados en $file_name\033[0m"
         fi
@@ -452,7 +473,7 @@ crack_hashes() {
 }
 
 # Colores del arcoíris para el menú
-colors=("\\033[1;31m" "\\033[1;33m" "\\033[1;32m" "\\033[1;36m" "\\033[1;34m" "\\033[1;35m")
+colors=("\033[1;31m" "\033[1;33m" "\033[1;32m" "\033[1;36m" "\033[1;34m" "\033[1;35m")
 
 # Opciones del menú
 options=(
@@ -496,158 +517,161 @@ while true; do
     get_ip_addresses
 
     # Mostrar opciones
-    echo -e "\\nOpciones:"
+    echo -e "\nOpciones:"
     for ((i=0; i<${#options[@]}; i++)); do
-        echo -e "${colors[$((i % ${#colors[@]}))]}$(($i+1))) ${colors[$((i % ${#colors[@]}))]}${options[$i]}\\033[0m"
+        echo -e "${colors[$((i % ${#colors[@]}))]}$((i+1))) ${options[$i]}\033[0m"
     done
 
     echo -e "\033[1;34mIngresa el número de la opción que deseas ejecutar (o 'x' para salir):\033[0m"
-    read -p "" option
+    read_input "" option
 
     case $option in
         1) # Dig
-            read -p "Ingresa el dominio que deseas consultar con el comando Dig: " domain
+            while true; do
+                read_input "Ingresa el dominio que deseas consultar con el comando Dig: " domain
+                validate_domain "$domain" && break
+            done
             dig "$domain"
             # Verificar vulnerabilidad de transferencia de zona
             check_zone_transfer_vulnerability "$domain"
             ;;
         2) # Host
-            read -p "Ingresa el dominio o la IP que deseas consultar con el comando Host: " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas consultar con el comando Host: " domain_or_ip
             host "$domain_or_ip"
             ;;
         3) # IP
-            read -p "Ingresa el dominio para mostrar su IP: " domain_to_ip
+            read_input "Ingresa el dominio para mostrar su IP: " domain_to_ip
             print_green_ip "$domain_to_ip"
             ;;
         4) # NMap
-            read -p "Ingresa el dominio o la IP que deseas escanear con NMap: " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas escanear con NMap: " domain_or_ip
             nmap -Pn -p 1-1000 "$domain_or_ip"
             ;;
         5) # NmapVuln
-            read -p "Ingresa el dominio o la IP que deseas escanear con NMap (Vulnerabilidades): " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas escanear con NMap (Vulnerabilidades): " domain_or_ip
             nmap -Pn --script vuln -p 1-1000 "$domain_or_ip"
             ;;
         6) # nslookup
-            read -p "Ingresa el dominio o la IP que deseas consultar con el comando nslookup: " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas consultar con el comando nslookup: " domain_or_ip
             nslookup "$domain_or_ip"
             ;;
         7) # ping
-            read -p "Ingresa el dominio o la IP que deseas hacer ping: " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas hacer ping: " domain_or_ip
             ping -c 4 "$domain_or_ip"
             ;;
         8) # Status-Viewer
-            read -p "Ingresa el dominio o la IP para ver el estado del servidor: " address
+            read_input "Ingresa el dominio o la IP para ver el estado del servidor: " address
             ip_address=$(host "$address" | awk '/has address/ {print $4}')
-            echo -e "IP Address: \\033[0;32m$ip_address\\033[0m"
+            echo -e "IP Address: \033[0;32m$ip_address\033[0m"
             while true; do
                 clear
                 echo "Implementa la funcionalidad para Status-Viewer aquí"
                 # Ejecutar el código para el dominio
-                curl_output=$(curl -s -X $'GET' -H $'Host: '$address'' -H $'Accept-Encoding: gzip, deflate' -H $'Accept: */*' -H $'Accept-Language: en-US;q=0.9,en;q=0.8' -H $'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36' -H $'Connection: close' -H $'Cache-Control: max-age=0' $'http://'$address'/server-status?full=true' -k --compressed | lynx -stdin -dump)
-                echo -e "\\nResultados para $address:"
+                curl_output=$(curl -s -X GET -H "Host: $address" -H "Accept-Encoding: gzip, deflate" -H "Accept: */*" -H "Accept-Language: en-US;q=0.9,en;q=0.8" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -H "Connection: close" -H "Cache-Control: max-age=0" "http://$address/server-status?full=true" -k --compressed | lynx -stdin -dump)
+                echo -e "\nResultados para $address:"
                 echo "$curl_output"
                 # Ejecutar el código para la IP si está disponible
                 if [[ -n "$ip_address" ]]; then
-                    curl_output_ip=$(curl -s -X $'GET' -H $'Host: '$ip_address'' -H $'Accept-Encoding: gzip, deflate' -H $'Accept: */*' -H $'Accept-Language: en-US;q=0.9,en;q=0.8' -H $'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.5615.50 Safari/537.36' -H $'Connection: close' -H $'Cache-Control: max-age=0' $'http://'$ip_address'/server-status?full=true' -k --compressed | lynx -stdin -dump)
-                    echo -e "\\nResultados para $ip_address:"
+                    curl_output_ip=$(curl -s -X GET -H "Host: $ip_address" -H "Accept-Encoding: gzip, deflate" -H "Accept: */*" -H "Accept-Language: en-US;q=0.9,en;q=0.8" -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64)" -H "Connection: close" -H "Cache-Control: max-age=0" "http://$ip_address/server-status?full=true" -k --compressed | lynx -stdin -dump)
+                    echo -e "\nResultados para $ip_address:"
                     echo "$curl_output_ip"
                 fi
                 sleep 10
             done
             ;;
         9) # Whois
-            read -p "Ingresa el dominio o la IP que deseas consultar con el comando Whois: " domain_or_ip
+            read_input "Ingresa el dominio o la IP que deseas consultar con el comando Whois: " domain_or_ip
             whois "$domain_or_ip"
             ;;
         10) # Geolocalización
-            read -p "Ingresa la IP para obtener su geolocalización: " ip_address
+            read_input "Ingresa la IP para obtener su geolocalización: " ip_address
             get_geolocation "$ip_address"
             get_dns_name "$ip_address"
             get_as_number "$ip_address"
             ;;
         11) # Web Technologies
-            read -p "Ingresa la IP para detectar las tecnologías web: " ip_address
+            read_input "Ingresa la IP para detectar las tecnologías web: " ip_address
             get_web_technologies "$ip_address"
             ;;
         12) # Wayback URLs
-            read -p "Ingresa la dirección IP o el dominio para obtener URLs de Wayback Machine: " host
-            read -p "¿Incluir subdominios? (y/n): " with_subs
-            read -p "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
+            read_input "Ingresa la dirección IP o el dominio para obtener URLs de Wayback Machine: " host
+            read_input "¿Incluir subdominios? (y/n): " with_subs
+            read_input "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
             waybackurls_command "$host" "$with_subs" "$save_option"
             ;;
         13) # crt.sh Domain Search
-            read -p "Ingresa el dominio para buscar en crt.sh: " domain
-            read -p "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
+            read_input "Ingresa el dominio para buscar en crt.sh: " domain
+            read_input "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
             search_crtsh_domain "$domain" "$save_option"
             ;;
         14) # crt.sh Organization Search
-            read -p "Ingresa el nombre de la organización para buscar en crt.sh: " org
-            read -p "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
+            read_input "Ingresa el nombre de la organización para buscar en crt.sh: " org
+            read_input "Ingresa 's' para mostrar en pantalla o 'o' para guardar en archivo: " save_option
             search_crtsh_org "$org" "$save_option"
             ;;
         15) # XSS Test
-            read -p "Ingresa la URL base (Ejemplo: https://www.ejemplo.com/prueba.php?param=): " url_base
+            read_input "Ingresa la URL base (Ejemplo: https://www.ejemplo.com/prueba.php?param=): " url_base
             test_xss "$url_base"
             ;;
         16) # Host Header Injection Test
-            read -p "Ingresa el nombre del archivo que contiene la lista de dominios: " filename
+            read_input "Ingresa el nombre del archivo que contiene la lista de dominios: " filename
             check_host_header_injection "$filename"
             ;;
         17) # Show Cookies
-            read -p "Ingresa la URL para mostrar las cookies: " url
+            read_input "Ingresa la URL para mostrar las cookies: " url
             show_cookies "$url"
             ;;
         18) # Inject Cookies
-            read -p "Ingresa la URL para probar la inyección en cookies: " url
+            read_input "Ingresa la URL para probar la inyección en cookies: " url
             inject_cookies "$url"
             ;;
         19) # Nikto Web Scan
-            read -p "Ingresa la URL para escanear con Nikto: " url
+            read_input "Ingresa la URL para escanear con Nikto: " url
             scan_with_nikto "$url"
             ;;
         20) # Subdomain Enumeration
-            read -p "Ingresa el dominio para enumerar subdominios: " domain
+            read_input "Ingresa el dominio para enumerar subdominios: " domain
             enumerate_subdomains "$domain"
             ;;
         21) # HTTP Headers Analysis
-            read -p "Ingresa la URL para analizar los encabezados HTTP: " url
+            read_input "Ingresa la URL para analizar los encabezados HTTP: " url
             analyze_http_headers "$url"
             ;;
         22) # CMS Detection
-            read -p "Ingresa la URL para detectar el CMS: " url
+            read_input "Ingresa la URL para detectar el CMS: " url
             detect_cms "$url"
             ;;
         23) # Assetfinder + Httprobe
-            read -p "Ingresa el dominio para usar assetfinder y httprobe: " domain
+            read_input "Ingresa el dominio para usar assetfinder y httprobe: " domain
             run_assetfinder_httprobe "$domain"
             ;;
         24) # Subzy
-            read -p "Ingresa el nombre del archivo que contiene la lista de objetivos: " filename
+            read_input "Ingresa el nombre del archivo que contiene la lista de objetivos: " filename
             run_subzy "$filename"
             ;;
         25) # Dirb Directory Enumeration
-            read -p "Ingresa la URL para enumerar directorios y archivos con Dirb: " url
+            read_input "Ingresa la URL para enumerar directorios y archivos con Dirb: " url
             enumerate_directories_dirb "$url"
             ;;
         26) # Gobuster Directory Enumeration
-            read -p "Ingresa la URL para enumerar directorios y archivos con Gobuster: " url
+            read_input "Ingresa la URL para enumerar directorios y archivos con Gobuster: " url
             enumerate_directories_gobuster "$url"
             ;;
         27) # Masscan Port Scan
-            read -p "Ingresa el rango de IP para escanear con Masscan: " ip_range
-            read -p "Ingresa los puertos a escanear (Ejemplo: 80,443): " ports
+            read_input "Ingresa el rango de IP para escanear con Masscan: " ip_range
+            read_input "Ingresa los puertos a escanear (Ejemplo: 80,443): " ports
             scan_ports_masscan "$ip_range" "$ports"
             ;;
         28) # OSINT Social Media
-            read -p "Ingresa el nombre de usuario para realizar OSINT: " username
+            read_input "Ingresa el nombre de usuario para realizar OSINT: " username
             perform_osint_social_media "$username"
             ;;
         29) # Phishing Detection
-            read -p "Ingresa la URL para verificar phishing: " url
+            read_input "Ingresa la URL para verificar phishing: " url
             detect_phishing "$url"
             ;;
         30) # Hash Cracking
-            read -p "Ingresa el hash para crackear: " hash
+            read_input "Ingresa el hash para crackear: " hash
             crack_hashes "$hash"
             ;;
         0 | x | X) # Salir del Script
